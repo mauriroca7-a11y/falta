@@ -86,6 +86,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 #imgPrev{align-items:center;gap:12px;margin-top:10px}
 #imgThumb{width:64px;height:64px;border-radius:16px;object-fit:cover;border:2px solid var(--acc)}
 #btnImgX{background:var(--card2);border-radius:10px;padding:9px 14px;color:var(--mut);font-weight:700}
+.pipv{position:fixed;left:-9999px;top:0;width:320px;height:180px}
 </style>
 </head>
 <body>
@@ -104,6 +105,8 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 <div id="list"></div>
 
 <div class="install" id="install"><p>📲 ¿Instalar FALTA en tu celular?</p><div class="r"><button id="insYes">Instalar</button><button id="insNo">Rechazar</button></div><div class="t" id="insBar"></div></div>
+
+<video id="pipv" class="pipv" muted playsinline></video>
 
 <button class="fab" id="fab">+</button>
 
@@ -243,7 +246,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
       </div>
       <div class="bar"><i data-k="bar" style="width:${pct}%"></i></div>
       <div class="acts">
-        ${done ? '' : `<button data-a="pin" class="${it.pin?'on':''}">${it.pin?'📌 Fijada':'📌 Fijar en notificación'}</button>`}
+        ${done ? '' : `<button data-a="pin" class="${it.pin?'on':''}">${it.pin?'📌 Fijada':'📌 Fijar'}</button><button data-a="float">🪟 Flotar</button>`}
         <button data-a="edit">✏️</button>
         <button data-a="del">🗑</button>
       </div>
@@ -291,12 +294,67 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
       }
     });
     if (rerender) render();
+    if (floatId) drawFloat();
     document.title = (() => {
       const next = items.filter(i => i.t > now).sort((a,b)=>a.t-b.t)[0];
       return next ? `${txt(next.t-now)} · FALTA` : 'FALTA';
     })();
   }
-  setInterval(tick, 1000);
+  /* ---------- Ventana flotante (Picture-in-Picture) ---------- */
+  const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360;
+  const cx = cv.getContext('2d');
+  let floatId = null; const imgCache = {};
+  function getImg(src) {
+    if (!src) return null;
+    if (!imgCache[src]) { const i = new Image(); i.src = src; imgCache[src] = i; }
+    return imgCache[src].complete ? imgCache[src] : null;
+  }
+  function drawFloat() {
+    const it = items.find(x => x.id === floatId); if (!it) return;
+    const W = 640, H = 360, left = it.t - Date.now(), done = left <= 0, p = parts(left);
+    cx.fillStyle = '#0b0d14'; cx.fillRect(0, 0, W, H);
+    const g = cx.createLinearGradient(0, 0, W, H); g.addColorStop(0, it.col); g.addColorStop(1, '#0b0d14');
+    cx.globalAlpha = .75; cx.fillStyle = g; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1;
+    const im = getImg(it.img);
+    if (im) {
+      const m = Math.min(im.width, im.height);
+      cx.globalAlpha = .35; cx.drawImage(im, (im.width - m)/2, (im.height - m)/2, m, m, 0, (H - W)/2, W, W); cx.globalAlpha = 1;
+    }
+    cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(0, 0, W, H);
+    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#fff';
+    let label = (im ? '' : it.e + ' ') + it.n;
+    cx.font = 'bold 38px system-ui, sans-serif';
+    while (cx.measureText(label).width > W - 40 && label.length > 4) label = label.slice(0, -2);
+    cx.fillText(label, W/2, 52);
+    if (done) {
+      cx.fillStyle = '#35d07f'; cx.font = 'bold 74px system-ui, sans-serif'; cx.fillText('¡LLEGÓ LA HORA!', W/2, H/2 + 10);
+    } else {
+      cx.font = 'bold 34px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.85)';
+      cx.fillText(p.d > 0 ? `${p.d} ${p.d === 1 ? 'día' : 'días'}` : 'faltan', W/2, 112);
+      cx.fillStyle = '#fff'; cx.font = 'bold 118px ui-monospace, Menlo, Consolas, monospace';
+      cx.fillText(`${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`, W/2, 205);
+      cx.font = '26px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.7)';
+      cx.fillText('horas   ·   minutos   ·   segundos', W/2, 285);
+    }
+    cx.font = 'bold 20px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.55)'; cx.fillText('FALTA', W/2, H - 24);
+  }
+  async function startFloat(it) {
+    if (!document.pictureInPictureEnabled) { alert('Tu navegador no permite la ventana flotante. Usa Chrome actualizado.'); return; }
+    floatId = it.id; drawFloat();
+    const v = $('#pipv');
+    try {
+      if (!v.srcObject) v.srcObject = cv.captureStream(10);
+      await v.play();
+      if (document.pictureInPictureElement !== v) await v.requestPictureInPicture();
+    } catch (e) { alert('No se pudo abrir la ventana flotante: ' + (e && e.message || e)); }
+  }
+  $('#pipv').addEventListener('leavepictureinpicture', () => { floatId = null; });
+
+  /* Reloj que no se duerme: un Worker marca cada segundo aunque la app esté en segundo plano */
+  try {
+    const w = new Worker(URL.createObjectURL(new Blob(['setInterval(()=>postMessage(1),1000)'], { type: 'text/javascript' })));
+    w.onmessage = () => tick();
+  } catch (e) { setInterval(tick, 1000); }
   document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
 
   /* ---------- Formulario ---------- */
@@ -435,6 +493,8 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
       closeNotif('pin-'+id); items = items.filter(x => x.id !== id); save(); render();
     } else if (b.dataset.a === 'edit') {
       openSheet(it);
+    } else if (b.dataset.a === 'float') {
+      startFloat(it);
     } else if (b.dataset.a === 'pin') {
       if (!it.pin) {
         if (!permOK() && !(await askPerm())) return;
