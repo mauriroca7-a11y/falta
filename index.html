@@ -74,6 +74,18 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 #insYes{background:var(--acc);color:#fff}
 #insNo{background:var(--card);color:var(--mut)}
 .install .t{position:absolute;left:0;bottom:0;height:4px;background:var(--acc);width:100%}
+
+.card{background:linear-gradient(135deg,color-mix(in srgb,var(--c) 14%,var(--card)),var(--card) 75%)}
+.card>*:not(.bgimg){position:relative;z-index:1}
+.bgimg{position:absolute;inset:0;background-size:cover;background-position:center;opacity:.28;filter:saturate(1.1)}
+.bgimg::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--card) 0%,transparent 90%)}
+.thumb{width:48px;height:48px;border-radius:14px;object-fit:cover;border:2px solid var(--c)}
+.u{background:color-mix(in srgb,var(--c) 16%,var(--card2))}
+.imgpick{margin-top:10px}
+#btnImg{width:100%;background:var(--card2);border:1px dashed #394066;border-radius:12px;padding:13px;font-weight:700}
+#imgPrev{align-items:center;gap:12px;margin-top:10px}
+#imgThumb{width:64px;height:64px;border-radius:16px;object-fit:cover;border:2px solid var(--acc)}
+#btnImgX{background:var(--card2);border-radius:10px;padding:9px 14px;color:var(--mut);font-weight:700}
 </style>
 </head>
 <body>
@@ -127,8 +139,13 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
       </div>
     </div>
 
-    <label>Ícono</label>
+    <label>Ícono o imagen</label>
     <div class="chips emojis" id="emojis"></div>
+    <div class="imgpick">
+      <button type="button" id="btnImg">🖼 Elegir imagen de mi galería</button>
+      <input type="file" id="fImg" accept="image/*" hidden>
+      <div id="imgPrev" style="display:none"><img id="imgThumb" alt=""><button type="button" id="btnImgX">Quitar imagen</button></div>
+    </div>
 
     <label>Color</label>
     <div class="chips colors" id="colors"></div>
@@ -150,7 +167,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
   const fired = new Set();
 
   try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { items = []; }
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){ alert('No hay espacio para guardar. Prueba con una imagen más pequeña o borra alguna cuenta.'); } };
 
   /* ---------- Instalar como app + service worker ---------- */
   if ('serviceWorker' in navigator) {
@@ -214,7 +231,8 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     const p = parts(left);
     const pct = done ? 100 : Math.min(100, Math.max(0, (Date.now() - it.c) / (it.t - it.c) * 100));
     return `<div class="card ${big?'big':''} ${done?'done':''}" data-id="${it.id}" style="--c:${it.col}">
-      <div class="top"><span class="emoji">${it.e}</span><span class="name">${esc(it.n)}</span></div>
+      ${it.img?`<div class="bgimg" style="background-image:url(${it.img})"></div>`:''}
+      <div class="top">${it.img?`<img class="thumb" src="${it.img}" alt="">`:`<span class="emoji">${it.e}</span>`}<span class="name">${esc(it.n)}</span></div>
       <div class="when">${fmtWhen(it.t)}</div>
       ${done ? '<span class="badge">¡LLEGÓ LA HORA!</span>' : ''}
       <div class="clock">
@@ -260,7 +278,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
         card.querySelector('[data-k=m]').textContent = pad(p.m);
         card.querySelector('[data-k=s]').textContent = pad(p.s);
         card.querySelector('[data-k=bar]').style.width = Math.min(100,(now-it.c)/(it.t-it.c)*100)+'%';
-        if (it.pin) show(`${it.e} ${it.n}`, `Faltan ${txt(left)}`, 'pin-'+it.id, { requireInteraction:true });
+        if (it.pin) show(`${it.e} ${it.n}`, `Faltan ${txt(left)}`, 'pin-'+it.id, { requireInteraction:true, icon: it.img || undefined });
       }
       if (left <= 0 && !it.done) {
         it.done = true; rerender = true; save();
@@ -268,7 +286,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
         if (!fired.has(it.id)) {
           fired.add(it.id);
           beep();
-          show(`${it.e} ¡Llegó la hora!`, it.n, 'end-'+it.id, { silent:false, vibrate:[300,150,300,150,600], requireInteraction:true });
+          show(`${it.e} ¡Llegó la hora!`, it.n, 'end-'+it.id, { silent:false, vibrate:[300,150,300,150,600], requireInteraction:true, icon: it.img || undefined });
         }
       }
     });
@@ -304,12 +322,73 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     $('#dD').value = p.d; $('#dH').value = p.h; $('#dM').value = p.m; $('#dS').value = p.s;
   };
 
+  /* ---------- Imagen de la galería + colores automáticos ---------- */
+  let selImg = null;
+  function showPrev() {
+    $('#imgPrev').style.display = selImg ? 'flex' : 'none';
+    if (selImg) $('#imgThumb').src = selImg;
+    $('#btnImg').textContent = selImg ? '🖼 Cambiar imagen' : '🖼 Elegir imagen de mi galería';
+  }
+  function dominantColor(img) {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const x = c.getContext('2d'); x.drawImage(img, 0, 0, 32, 32);
+    const d = x.getImageData(0, 0, 32, 32).data;
+    const B = Array.from({length:12}, () => ({w:0,r:0,g:0,b:0}));
+    for (let i = 0; i < d.length; i += 4) {
+      const r = d[i], g = d[i+1], b = d[i+2];
+      const mx = Math.max(r,g,b), mn = Math.min(r,g,b), v = mx/255, s = mx ? (mx-mn)/mx : 0;
+      if (v < .2) continue;
+      let hu = 0;
+      if (mx !== mn) {
+        if (mx === r) hu = ((g-b)/(mx-mn)) % 6; else if (mx === g) hu = (b-r)/(mx-mn) + 2; else hu = (r-g)/(mx-mn) + 4;
+        hu = (hu*60 + 360) % 360;
+      }
+      const w = s*s*v + .001, k = B[Math.floor(hu/30)%12];
+      k.w += w; k.r += r*w; k.g += g*w; k.b += b*w;
+    }
+    let best = B[0]; B.forEach(k => { if (k.w > best.w) best = k; });
+    let r = best.r/best.w, g = best.g/best.w, b = best.b/best.w;
+    const mx = Math.max(r,g,b);
+    if (mx < 150) { const f = 150/Math.max(mx,1); r = Math.min(255,r*f); g = Math.min(255,g*f); b = Math.min(255,b*f); }
+    return '#' + [r,g,b].map(n => Math.round(n).toString(16).padStart(2,'0')).join('');
+  }
+  function processFile(file) {
+    return new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onerror = rej;
+      fr.onload = () => {
+        const im = new Image();
+        im.onerror = rej;
+        im.onload = () => {
+          const S = 480, c = document.createElement('canvas'); c.width = c.height = S;
+          const m = Math.min(im.width, im.height), sx = (im.width-m)/2, sy = (im.height-m)/2;
+          c.getContext('2d').drawImage(im, sx, sy, m, m, 0, 0, S, S);
+          const url = c.toDataURL('image/jpeg', .75);
+          const t = new Image(); t.onload = () => res({ url, color: dominantColor(t) }); t.src = url;
+        };
+        im.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
+  }
+  $('#btnImg').onclick = () => $('#fImg').click();
+  $('#fImg').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      const r = await processFile(f);
+      selImg = r.url; selColor = r.color; buildPickers(); showPrev();
+    } catch(err) { alert('No pude leer esa imagen. Prueba con otra.'); }
+  };
+  $('#btnImgX').onclick = () => { selImg = null; showPrev(); };
+
   function openSheet(it) {
     editing = it ? it.id : null;
     $('#sheetTitle').textContent = it ? 'Editar' : 'Nueva cuenta regresiva';
     $('#fName').value = it ? it.n : '';
     selEmoji = it ? it.e : EMOJIS[0];
     selColor = it ? it.col : COLORS[0];
+    selImg = it ? (it.img || null) : null; showPrev();
     const d = new Date(it ? it.t : Date.now() + 86400000);
     $('#fDate').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     $('#fTime').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -337,10 +416,10 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     if (isNaN(target)) { alert('Fecha no válida.'); return; }
     if (editing) {
       const it = items.find(x => x.id === editing);
-      Object.assign(it, { n:name, e:selEmoji, col:selColor, t:target, done: target <= Date.now() });
+      Object.assign(it, { n:name, e:selEmoji, col:selColor, img:selImg, t:target, done: target <= Date.now() });
       fired.delete(it.id);
     } else {
-      items.push({ id: 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), n:name, e:selEmoji, col:selColor, t:target, c:Date.now(), pin:false, done:false });
+      items.push({ id: 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), n:name, e:selEmoji, col:selColor, img:selImg, t:target, c:Date.now(), pin:false, done:false });
     }
     save(); closeSheet(); render(); tick();
     if ('Notification' in window && Notification.permission === 'default') askPerm();
