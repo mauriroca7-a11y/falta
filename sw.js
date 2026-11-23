@@ -1,4 +1,4 @@
-const C='falta-v5';
+const C='falta-v6';
 const pad=n=>String(n).padStart(2,'0');
 function fmt(ms){let s=Math.max(0,Math.floor(ms/1000));const d=Math.floor(s/86400);s%=86400;const h=Math.floor(s/3600);s%=3600;const m=Math.floor(s/60);s%=60;return `${d}d ${pad(h)}h ${pad(m)}m ${pad(s)}s`;}
 self.addEventListener('install',e=>{self.skipWaiting();e.waitUntil(caches.open(C).then(c=>c.addAll(['./','index.html','manifest.json','icon-192.png','icon-512.png']).catch(()=>{})))});

@@ -88,6 +88,9 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 #btnImgX{background:var(--card2);border-radius:10px;padding:9px 14px;color:var(--mut);font-weight:700}
 .pipv{position:fixed;left:-9999px;top:0;width:320px;height:180px}
 .hbtns{display:flex;gap:8px}
+.keep{margin:0 4px 14px;padding:10px 12px;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer}
+.keep.ok{background:#12301f;color:#6be8a3}
+.keep.off{background:#3a2a10;color:#ffc861;border:1px dashed #a77a2a}
 .alarmbar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));background:#d3202a;border-radius:16px;padding:12px 14px;z-index:40;display:none;align-items:center;gap:10px;box-shadow:0 10px 30px #000a;animation:pulse 1s infinite}
 .alarmbar.show{display:flex}
 .alarmbar span{flex:1;font-weight:800;font-size:15px}
@@ -115,6 +118,7 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
   <div class="hbtns"><button class="iconbtn" id="btnFloatAll" title="Flotar todos">🪟</button><button class="iconbtn" id="btnBell" title="Notificaciones">🔔</button></div>
 </header>
 <p class="sub">¿Cuánto falta para lo que importa?</p>
+<div class="keep" id="keep" style="display:none"></div>
 
 <div class="banner" id="banner">
   <b>Activa las notificaciones</b> para ver el conteo en la barra de tu celular y recibir el aviso cuando llegue la hora.
@@ -306,6 +310,7 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
     const open = el.querySelector('details.arch[open]');
     el.innerHTML = html;
     if (open) { const d = el.querySelector('details.arch'); if (d) d.open = true; }
+    try { updateKeep(); } catch (e) {}
   }
 
   /* ---------- Tic cada segundo ---------- */
@@ -344,7 +349,8 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
         alarming.forEach((t0, id) => { const i = items.find(x => x.id === id); if (i) show(`${i.e} ¡Llegó la hora!`, i.n, 'end-'+id, { silent:false, renotify:true, vibrate:[1000,300,1000,300,1000,300,1500], requireInteraction:true, icon: i.img || undefined }); });
       }
     }
-    if (!alarming.size && !alarm.paused) { alarm.pause(); updateAlarmBar(); }
+    if (alarmMode && !alarming.size) stopAlarm();
+    if (keepOn && !hasActive() && !alarmMode) { try { alarm.pause(); } catch (e) {} keepOn = false; updateKeep(); }
     document.title = (() => {
       const next = items.filter(i => i.t > now).sort((a,b)=>a.t-b.t)[0];
       return next ? `${txt(next.t-now)} · FALTA` : 'FALTA';
@@ -475,7 +481,36 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
   const defaultWavUrl = makeWav();
   const alarm = new Audio(); alarm.loop = true; alarm.volume = 1;
   const alarming = new Map();
-  let lastVib = 0, lastNote = 0;
+  let lastVib = 0, lastNote = 0, alarmMode = false, keepOn = false;
+  const silentUrl = (() => {
+    const sr = 8000, n = sr, buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o+i, s.charCodeAt(i)); };
+    w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVEfmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+    for (let i = 0; i < n; i++) v.setInt16(44+i*2, i % 2 ? 1 : -1, true);
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  })();
+  const hasActive = () => items.some(i => !i.arch && i.t > Date.now());
+  function updateKeep() {
+    const k = $('#keep');
+    if (!hasActive()) { k.style.display = 'none'; return; }
+    k.style.display = 'block'; k.className = 'keep ' + (keepOn ? 'ok' : 'off');
+    k.textContent = keepOn ? '🛡 Alarma segura activa: sonará aunque salgas de la app' : '⚠️ Toca aquí para activar la alarma segura';
+  }
+  async function ensureKeepAlive() {
+    if (alarmMode || alarming.size) return;
+    if (!hasActive()) { if (keepOn) { try { alarm.pause(); } catch (e) {} keepOn = false; } updateKeep(); return; }
+    if (keepOn && !alarm.paused) { updateKeep(); return; }
+    try {
+      alarm.src = silentUrl; alarm.volume = 1; alarm.loop = true;
+      await alarm.play(); keepOn = true;
+      try { navigator.mediaSession.metadata = new MediaMetadata({ title: 'FALTA', artist: 'Cuentas regresivas en marcha' }); } catch (e) {}
+    } catch (e) { keepOn = false; }
+    updateKeep();
+  }
+  $('#keep').onclick = () => ensureKeepAlive();
+  document.addEventListener('pointerdown', () => { if (!keepOn && !alarmMode) ensureKeepAlive(); }, { passive: true });
+  alarm.addEventListener('pause', () => { if (!alarmMode) { keepOn = false; updateKeep(); } });
   function updateAlarmBar() {
     const bar = $('#alarmBar');
     if (!alarming.size) { bar.classList.remove('show'); return; }
@@ -484,8 +519,9 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
     bar.classList.add('show');
   }
   async function startAlarm(it) {
-    alarming.set(it.id, Date.now());
-    if (alarm.paused) {
+    const first = !alarmMode;
+    alarming.set(it.id, Date.now()); alarmMode = true; keepOn = false;
+    if (first) {
       let url = defaultWavUrl;
       if (it.snd) { try { const b = await idbGet(it.id); if (b) url = URL.createObjectURL(b); } catch (e) {} }
       alarm.src = url; alarm.volume = 1;
@@ -496,7 +532,7 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
   }
   function stopAlarm(id) {
     if (id) alarming.delete(id); else alarming.clear();
-    if (!alarming.size) { try { alarm.pause(); alarm.currentTime = 0; } catch (e) {} try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} }
+    if (!alarming.size) { alarmMode = false; try { alarm.pause(); alarm.currentTime = 0; } catch (e) {} try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} setTimeout(ensureKeepAlive, 80); }
     updateAlarmBar();
   }
   $('#alarmStop').onclick = () => stopAlarm();
@@ -653,7 +689,7 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
     const sid = editing || items[items.length-1].id, sit = items.find(x => x.id === sid);
     if (sndBlob) { idbPut(sid, sndBlob).catch(() => {}); sit.snd = true; sit.sndName = sndBlob.name; }
     else if (sndRemoved) { idbDel(sid); sit.snd = false; sit.sndName = ''; }
-    save(); closeSheet(); render(); tick();
+    save(); closeSheet(); render(); tick(); ensureKeepAlive();
     if ('Notification' in window && Notification.permission === 'default') askPerm();
   };
 
@@ -673,7 +709,7 @@ details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:po
       it.arch = true; it.pin = false; stopAlarm(id); floatIds.delete(id); closeNotif('pin-'+id); closeNotif('end-'+id); save(); render();
     } else if (b.dataset.a === 'restart') {
       let dur = it.t - it.c; if (!(dur >= 1000)) dur = 60000;
-      it.c = Date.now(); it.t = it.c + dur; it.done = false; it.arch = false; fired.delete(id); stopAlarm(id); save(); render(); tick();
+      it.c = Date.now(); it.t = it.c + dur; it.done = false; it.arch = false; fired.delete(id); stopAlarm(id); save(); render(); tick(); ensureKeepAlive();
     } else if (b.dataset.a === 'pin') {
       if (!it.pin) {
         if (!permOK() && !(await askPerm())) return;
