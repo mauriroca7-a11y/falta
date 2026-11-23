@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d14">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>FALTA</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230b0d14'/%3E%3Ctext x='50' y='66' font-size='56' text-anchor='middle'%3E%E2%8F%B3%3C/text%3E%3C/svg%3E">
+<style>
+:root{--bg:#0b0d14;--card:#151826;--card2:#1c2033;--txt:#f2f4ff;--mut:#8b91ad;--acc:#ff5a3c;--ok:#35d07f;--r:20px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+body{padding:env(safe-area-inset-top) 14px calc(110px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;padding:16px 4px 8px}
+h1{margin:0;font-size:26px;letter-spacing:3px;font-weight:900}
+h1 span{color:var(--acc)}
+.sub{color:var(--mut);font-size:13px;margin:0 4px 14px}
+button{font:inherit;color:inherit;border:0;cursor:pointer}
+.iconbtn{background:var(--card);border-radius:12px;padding:9px 12px;font-size:18px}
+.banner{background:var(--card2);border:1px dashed #394066;border-radius:14px;padding:12px 14px;font-size:13px;color:var(--mut);margin-bottom:14px;display:none}
+.banner b{color:var(--txt)}
+.banner button{margin-top:8px;background:var(--acc);color:#fff;border-radius:10px;padding:8px 14px;font-weight:700}
+.card{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:14px;position:relative;overflow:hidden;border:1px solid #22273d}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:var(--c,var(--acc))}
+.top{display:flex;align-items:center;gap:10px}
+.emoji{font-size:30px}
+.name{font-weight:800;font-size:18px;flex:1;word-break:break-word}
+.when{color:var(--mut);font-size:12px;margin:2px 0 12px 40px}
+.clock{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.u{background:var(--card2);border-radius:14px;padding:10px 2px}
+.u b{display:block;font-size:30px;font-variant-numeric:tabular-nums;font-weight:800;line-height:1.1}
+.u small{color:var(--mut);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+.card.big .u b{font-size:38px}
+.bar{height:6px;background:var(--card2);border-radius:9px;margin-top:12px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--c,var(--acc));width:0;transition:width .5s}
+.acts{display:flex;gap:8px;margin-top:12px}
+.acts button{flex:1;background:var(--card2);border-radius:12px;padding:10px 4px;font-size:13px;font-weight:600}
+.acts button.on{background:var(--c,var(--acc));color:#fff}
+.done .u b{color:var(--ok)}
+.done .clock{opacity:.9}
+.badge{display:inline-block;background:var(--ok);color:#06210f;font-weight:800;font-size:12px;border-radius:99px;padding:3px 10px;margin-left:40px;margin-bottom:8px}
+.empty{text-align:center;color:var(--mut);padding:50px 20px}
+.empty .e{font-size:60px}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));background:var(--acc);color:#fff;width:62px;height:62px;border-radius:50%;font-size:32px;box-shadow:0 8px 24px #ff5a3c66}
+.sheet{position:fixed;inset:0;background:#000a;display:none;align-items:flex-end;z-index:10}
+.sheet.show{display:flex}
+.panel{background:var(--card);width:100%;border-radius:26px 26px 0 0;padding:20px 18px calc(22px + env(safe-area-inset-bottom));max-height:92vh;overflow:auto}
+.panel h2{margin:0 0 14px;font-size:20px}
+label{display:block;font-size:12px;color:var(--mut);margin:12px 0 5px;text-transform:uppercase;letter-spacing:1px}
+input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--txt);border-radius:12px;padding:13px;font:inherit;font-size:16px}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.tabs{display:flex;background:var(--card2);border-radius:12px;padding:4px;margin-bottom:4px}
+.tabs button{flex:1;background:none;padding:10px;border-radius:9px;font-weight:700;color:var(--mut)}
+.tabs button.on{background:var(--acc);color:#fff}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chips button{background:var(--card2);border-radius:10px;padding:9px 12px;font-weight:700;font-size:14px}
+.emojis button{font-size:24px;padding:6px 9px}
+.emojis button.on,.colors button.on{outline:2px solid var(--txt)}
+.colors button{width:34px;height:34px;border-radius:50%;padding:0}
+.save{width:100%;background:var(--acc);color:#fff;border-radius:14px;padding:15px;font-weight:800;font-size:16px;margin-top:18px}
+.cancel{width:100%;background:none;color:var(--mut);padding:12px;margin-top:4px}
+
+.install{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));background:var(--card2);border:1px solid #394066;border-radius:18px;padding:14px;z-index:20;box-shadow:0 10px 30px #000a;display:none;overflow:hidden}
+.install.show{display:block;animation:dn .35s ease}
+@keyframes dn{from{transform:translateY(-120%)}to{transform:none}}
+.install p{margin:0 0 10px;font-weight:700}
+.install .r{display:flex;gap:8px}
+.install .r button{flex:1;border-radius:12px;padding:11px;font-weight:800}
+#insYes{background:var(--acc);color:#fff}
+#insNo{background:var(--card);color:var(--mut)}
+.install .t{position:absolute;left:0;bottom:0;height:4px;background:var(--acc);width:100%}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>FAL<span>TA</span></h1>
+  <button class="iconbtn" id="btnBell" title="Notificaciones">🔔</button>
+</header>
+<p class="sub">¿Cuánto falta para lo que importa?</p>
+
+<div class="banner" id="banner">
+  <b>Activa las notificaciones</b> para ver el conteo en la barra de tu celular y recibir el aviso cuando llegue la hora.
+  <br><button id="btnPerm">Activar notificaciones</button>
+</div>
+
+<div id="list"></div>
+
+<div class="install" id="install"><p>📲 ¿Instalar FALTA en tu celular?</p><div class="r"><button id="insYes">Instalar</button><button id="insNo">Rechazar</button></div><div class="t" id="insBar"></div></div>
+
+<button class="fab" id="fab">+</button>
+
+<div class="sheet" id="sheet">
+  <div class="panel">
+    <h2 id="sheetTitle">Nueva cuenta regresiva</h2>
+
+    <label>¿Qué es?</label>
+    <input id="fName" placeholder="Ej: Entregar pedido, Estreno película…" maxlength="60">
+
+    <label>Cuándo</label>
+    <div class="tabs">
+      <button id="tabDate" class="on">📅 Fecha y hora</button>
+      <button id="tabDur">⏱ Duración</button>
+    </div>
+
+    <div id="boxDate">
+      <div class="row" style="margin-top:8px">
+        <input type="date" id="fDate">
+        <input type="time" id="fTime" value="09:00">
+      </div>
+    </div>
+
+    <div id="boxDur" style="display:none">
+      <div class="row" style="margin-top:8px">
+        <div><label style="margin-top:0">Días</label><input type="number" id="dD" min="0" value="0" inputmode="numeric"></div>
+        <div><label style="margin-top:0">Horas</label><input type="number" id="dH" min="0" value="0" inputmode="numeric"></div>
+        <div><label style="margin-top:0">Min</label><input type="number" id="dM" min="0" value="30" inputmode="numeric"></div>
+        <div><label style="margin-top:0">Seg</label><input type="number" id="dS" min="0" value="0" inputmode="numeric"></div>
+      </div>
+      <div class="chips" style="margin-top:10px">
+        <button data-q="300">5 min</button><button data-q="900">15 min</button><button data-q="1800">30 min</button><button data-q="3600">1 h</button><button data-q="86400">1 día</button>
+      </div>
+    </div>
+
+    <label>Ícono</label>
+    <div class="chips emojis" id="emojis"></div>
+
+    <label>Color</label>
+    <div class="chips colors" id="colors"></div>
+
+    <button class="save" id="btnSave">Guardar</button>
+    <button class="cancel" id="btnCancel">Cancelar</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const KEY = 'falta_items_v1';
+  const EMOJIS = ['⏳','🎬','📦','💼','🎂','✈️','🙏','📞','💰','🛒','🥟','🎓'];
+  const COLORS = ['#ff5a3c','#ffb02e','#35d07f','#2fb5ff','#8b6bff','#ff4fa3'];
+  let items = [];
+  let editing = null, selEmoji = EMOJIS[0], selColor = COLORS[0], mode = 'date';
+  let swReg = null;
+  const fired = new Set();
+
+  try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch(e) { items = []; }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){} };
+
+  /* ---------- Instalar como app + service worker ---------- */
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(async () => { swReg = await navigator.serviceWorker.ready; }).catch(()=>{});
+  }
+
+  /* ---------- Utilidades ---------- */
+  const pad = n => String(n).padStart(2,'0');
+  function parts(ms) {
+    let s = Math.floor(Math.abs(ms)/1000);
+    const d = Math.floor(s/86400); s%=86400;
+    const h = Math.floor(s/3600); s%=3600;
+    const m = Math.floor(s/60); s%=60;
+    return {d,h,m,s};
+  }
+  const txt = ms => { const p = parts(ms); return `${p.d}d ${pad(p.h)}h ${pad(p.m)}m ${pad(p.s)}s`; };
+  const fmtWhen = t => new Date(t).toLocaleString('es-BO',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  /* ---------- Notificaciones ---------- */
+  const permOK = () => 'Notification' in window && Notification.permission === 'granted';
+  function updateBanner() {
+    const can = 'Notification' in window;
+    $('#banner').style.display = (can && Notification.permission === 'default') ? 'block' : 'none';
+    $('#btnBell').textContent = permOK() ? '🔔' : '🔕';
+  }
+  async function askPerm() {
+    if (!('Notification' in window)) { alert('Este navegador no soporta notificaciones. Prueba con Chrome.'); return false; }
+    const r = await Notification.requestPermission();
+    updateBanner();
+    return r === 'granted';
+  }
+  async function show(title, body, tag, extra = {}) {
+    if (!permOK()) return;
+    const opts = Object.assign({ body, tag, silent:true, renotify:false, icon:undefined }, extra);
+    try {
+      const reg = swReg || (navigator.serviceWorker && await navigator.serviceWorker.getRegistration());
+      if (reg && reg.active) { await reg.showNotification(title, opts); return; }
+    } catch(e){}
+    try { new Notification(title, opts); } catch(e){}
+  }
+  function closeNotif(tag) {
+    try { (swReg ? swReg.getNotifications({tag}) : Promise.resolve([])).then(a => a.forEach(n => n.close())); } catch(e){}
+  }
+  function beep() {
+    try {
+      const a = new (window.AudioContext||window.webkitAudioContext)();
+      [0,0.25,0.5].forEach(t => {
+        const o = a.createOscillator(), g = a.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(a.destination);
+        g.gain.setValueAtTime(.25, a.currentTime+t); g.gain.exponentialRampToValueAtTime(.001, a.currentTime+t+.2);
+        o.start(a.currentTime+t); o.stop(a.currentTime+t+.22);
+      });
+    } catch(e){}
+    try { navigator.vibrate && navigator.vibrate([300,150,300,150,600]); } catch(e){}
+  }
+
+  /* ---------- Dibujo ---------- */
+  function cardHTML(it, big) {
+    const left = it.t - Date.now();
+    const done = left <= 0;
+    const p = parts(left);
+    const pct = done ? 100 : Math.min(100, Math.max(0, (Date.now() - it.c) / (it.t - it.c) * 100));
+    return `<div class="card ${big?'big':''} ${done?'done':''}" data-id="${it.id}" style="--c:${it.col}">
+      <div class="top"><span class="emoji">${it.e}</span><span class="name">${esc(it.n)}</span></div>
+      <div class="when">${fmtWhen(it.t)}</div>
+      ${done ? '<span class="badge">¡LLEGÓ LA HORA!</span>' : ''}
+      <div class="clock">
+        <div class="u"><b data-k="d">${done?'0':p.d}</b><small>días</small></div>
+        <div class="u"><b data-k="h">${done?'00':pad(p.h)}</b><small>horas</small></div>
+        <div class="u"><b data-k="m">${done?'00':pad(p.m)}</b><small>min</small></div>
+        <div class="u"><b data-k="s">${done?'00':pad(p.s)}</b><small>seg</small></div>
+      </div>
+      <div class="bar"><i data-k="bar" style="width:${pct}%"></i></div>
+      <div class="acts">
+        ${done ? '' : `<button data-a="pin" class="${it.pin?'on':''}">${it.pin?'📌 Fijada':'📌 Fijar en notificación'}</button>`}
+        <button data-a="edit">✏️</button>
+        <button data-a="del">🗑</button>
+      </div>
+    </div>`;
+  }
+  const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+  function render() {
+    const el = $('#list');
+    if (!items.length) {
+      el.innerHTML = '<div class="empty"><div class="e">⏳</div><p>Aún no tienes cuentas regresivas.<br>Toca <b>+</b> para crear la primera.</p></div>';
+      return;
+    }
+    const sorted = [...items].sort((a,b) => {
+      const da = a.t < Date.now(), db = b.t < Date.now();
+      return da === db ? a.t - b.t : (da ? 1 : -1);
+    });
+    el.innerHTML = sorted.map((it,i) => cardHTML(it, i===0)).join('');
+  }
+
+  /* ---------- Tic cada segundo ---------- */
+  function tick() {
+    const now = Date.now();
+    let rerender = false;
+    items.forEach(it => {
+      const left = it.t - now;
+      const card = document.querySelector(`.card[data-id="${it.id}"]`);
+      if (left > 0 && card) {
+        const p = parts(left);
+        card.querySelector('[data-k=d]').textContent = p.d;
+        card.querySelector('[data-k=h]').textContent = pad(p.h);
+        card.querySelector('[data-k=m]').textContent = pad(p.m);
+        card.querySelector('[data-k=s]').textContent = pad(p.s);
+        card.querySelector('[data-k=bar]').style.width = Math.min(100,(now-it.c)/(it.t-it.c)*100)+'%';
+        if (it.pin) show(`${it.e} ${it.n}`, `Faltan ${txt(left)}`, 'pin-'+it.id, { requireInteraction:true });
+      }
+      if (left <= 0 && !it.done) {
+        it.done = true; rerender = true; save();
+        closeNotif('pin-'+it.id);
+        if (!fired.has(it.id)) {
+          fired.add(it.id);
+          beep();
+          show(`${it.e} ¡Llegó la hora!`, it.n, 'end-'+it.id, { silent:false, vibrate:[300,150,300,150,600], requireInteraction:true });
+        }
+      }
+    });
+    if (rerender) render();
+    document.title = (() => {
+      const next = items.filter(i => i.t > now).sort((a,b)=>a.t-b.t)[0];
+      return next ? `${txt(next.t-now)} · FALTA` : 'FALTA';
+    })();
+  }
+  setInterval(tick, 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(); });
+
+  /* ---------- Formulario ---------- */
+  function buildPickers() {
+    $('#emojis').innerHTML = EMOJIS.map(e => `<button data-e="${e}" class="${e===selEmoji?'on':''}">${e}</button>`).join('');
+    $('#colors').innerHTML = COLORS.map(c => `<button data-c="${c}" style="background:${c}" class="${c===selColor?'on':''}"></button>`).join('');
+  }
+  $('#emojis').onclick = e => { const b = e.target.closest('button'); if (!b) return; selEmoji = b.dataset.e; buildPickers(); };
+  $('#colors').onclick = e => { const b = e.target.closest('button'); if (!b) return; selColor = b.dataset.c; buildPickers(); };
+
+  function setMode(m) {
+    mode = m;
+    $('#tabDate').classList.toggle('on', m==='date');
+    $('#tabDur').classList.toggle('on', m==='dur');
+    $('#boxDate').style.display = m==='date' ? 'block' : 'none';
+    $('#boxDur').style.display = m==='dur' ? 'block' : 'none';
+  }
+  $('#tabDate').onclick = () => setMode('date');
+  $('#tabDur').onclick = () => setMode('dur');
+  $('#boxDur').onclick = e => {
+    const b = e.target.closest('[data-q]'); if (!b) return;
+    const q = +b.dataset.q, p = parts(q*1000);
+    $('#dD').value = p.d; $('#dH').value = p.h; $('#dM').value = p.m; $('#dS').value = p.s;
+  };
+
+  function openSheet(it) {
+    editing = it ? it.id : null;
+    $('#sheetTitle').textContent = it ? 'Editar' : 'Nueva cuenta regresiva';
+    $('#fName').value = it ? it.n : '';
+    selEmoji = it ? it.e : EMOJIS[0];
+    selColor = it ? it.col : COLORS[0];
+    const d = new Date(it ? it.t : Date.now() + 86400000);
+    $('#fDate').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    $('#fTime').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setMode('date');
+    buildPickers();
+    $('#sheet').classList.add('show');
+  }
+  const closeSheet = () => $('#sheet').classList.remove('show');
+  $('#fab').onclick = () => { openSheet(null); if ('Notification' in window && Notification.permission==='default') {} };
+  $('#btnCancel').onclick = closeSheet;
+  $('#sheet').onclick = e => { if (e.target.id === 'sheet') closeSheet(); };
+
+  $('#btnSave').onclick = () => {
+    const name = $('#fName').value.trim();
+    if (!name) { $('#fName').focus(); return; }
+    let target;
+    if (mode === 'date') {
+      if (!$('#fDate').value) { $('#fDate').focus(); return; }
+      target = new Date(`${$('#fDate').value}T${$('#fTime').value || '00:00'}`).getTime();
+    } else {
+      const sec = (+$('#dD').value||0)*86400 + (+$('#dH').value||0)*3600 + (+$('#dM').value||0)*60 + (+$('#dS').value||0);
+      if (sec <= 0) { alert('Pon una duración mayor a cero.'); return; }
+      target = Date.now() + sec*1000;
+    }
+    if (isNaN(target)) { alert('Fecha no válida.'); return; }
+    if (editing) {
+      const it = items.find(x => x.id === editing);
+      Object.assign(it, { n:name, e:selEmoji, col:selColor, t:target, done: target <= Date.now() });
+      fired.delete(it.id);
+    } else {
+      items.push({ id: 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), n:name, e:selEmoji, col:selColor, t:target, c:Date.now(), pin:false, done:false });
+    }
+    save(); closeSheet(); render(); tick();
+    if ('Notification' in window && Notification.permission === 'default') askPerm();
+  };
+
+  /* ---------- Acciones de tarjeta ---------- */
+  $('#list').onclick = async e => {
+    const b = e.target.closest('button[data-a]'); if (!b) return;
+    const id = b.closest('.card').dataset.id;
+    const it = items.find(x => x.id === id);
+    if (b.dataset.a === 'del') {
+      if (!confirm('¿Borrar "' + it.n + '"?')) return;
+      closeNotif('pin-'+id); items = items.filter(x => x.id !== id); save(); render();
+    } else if (b.dataset.a === 'edit') {
+      openSheet(it);
+    } else if (b.dataset.a === 'pin') {
+      if (!it.pin) {
+        if (!permOK() && !(await askPerm())) return;
+        it.pin = true; save(); render(); tick();
+      } else {
+        it.pin = false; closeNotif('pin-'+id); save(); render();
+      }
+    }
+  };
+
+  $('#btnPerm').onclick = askPerm;
+  $('#btnBell').onclick = async () => {
+    if (permOK()) show('🔔 FALTA', 'Las notificaciones están activas', 'test');
+    else await askPerm();
+  };
+
+  /* ---------- Mensaje de instalar (10 s) ---------- */
+  let deferred = null, insTimer = null;
+  const ins = $('#install');
+  function hideIns() { clearTimeout(insTimer); ins.classList.remove('show'); }
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault(); deferred = e;
+    if (sessionStorage.getItem('falta_ins_no')) return;
+    ins.classList.add('show');
+    const bar = $('#insBar'); bar.style.transition = 'none'; bar.style.width = '100%';
+    requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = 'width 10s linear'; bar.style.width = '0'; }));
+    insTimer = setTimeout(hideIns, 10000);
+  });
+  $('#insYes').onclick = async () => {
+    hideIns();
+    if (!deferred) return;
+    deferred.prompt(); await deferred.userChoice.catch(()=>{}); deferred = null;
+  };
+  $('#insNo').onclick = () => { try { sessionStorage.setItem('falta_ins_no','1'); } catch(e){} hideIns(); };
+  window.addEventListener('appinstalled', () => { hideIns(); deferred = null; });
+
+  items.forEach(i => { if (i.t <= Date.now()) { i.done = true; fired.add(i.id); } });
+  updateBanner(); render(); tick();
+})();
+</script>
+</body>
+</html>
