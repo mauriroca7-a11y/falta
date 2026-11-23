@@ -87,13 +87,32 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 #imgThumb{width:64px;height:64px;border-radius:16px;object-fit:cover;border:2px solid var(--acc)}
 #btnImgX{background:var(--card2);border-radius:10px;padding:9px 14px;color:var(--mut);font-weight:700}
 .pipv{position:fixed;left:-9999px;top:0;width:320px;height:180px}
+.hbtns{display:flex;gap:8px}
+.alarmbar{position:fixed;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top));background:#d3202a;border-radius:16px;padding:12px 14px;z-index:40;display:none;align-items:center;gap:10px;box-shadow:0 10px 30px #000a;animation:pulse 1s infinite}
+.alarmbar.show{display:flex}
+.alarmbar span{flex:1;font-weight:800;font-size:15px}
+.alarmbar button{background:#fff;color:#d3202a;border-radius:12px;padding:11px 16px;font-weight:900}
+@keyframes pulse{50%{filter:brightness(1.25)}}
+.sndrow{display:flex;gap:8px}
+.sndrow button{background:var(--card2);border-radius:12px;padding:12px;font-weight:700}
+#btnSnd{flex:1}
+.hint{color:var(--mut);font-size:13px;margin-top:6px;word-break:break-word}
+details.arch{margin-top:6px}
+details.arch summary{color:var(--mut);font-weight:700;padding:10px 4px;cursor:pointer}
+.mini{display:flex;align-items:center;gap:10px;background:var(--card);border-radius:14px;padding:10px 12px;margin-bottom:8px;border-left:5px solid var(--c)}
+.mini .thumb{width:34px;height:34px;border-radius:10px}
+.mini .mn{flex:1;min-width:0}
+.mini .mn b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini .mn small{color:var(--mut)}
+.mini button{background:var(--card2);border-radius:10px;padding:9px 11px;font-size:16px}
+</style>
 </style>
 </head>
 <body>
 
 <header>
   <h1>FAL<span>TA</span></h1>
-  <button class="iconbtn" id="btnBell" title="Notificaciones">🔔</button>
+  <div class="hbtns"><button class="iconbtn" id="btnFloatAll" title="Flotar todos">🪟</button><button class="iconbtn" id="btnBell" title="Notificaciones">🔔</button></div>
 </header>
 <p class="sub">¿Cuánto falta para lo que importa?</p>
 
@@ -107,6 +126,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 <div class="install" id="install"><p>📲 ¿Instalar FALTA en tu celular?</p><div class="r"><button id="insYes">Instalar</button><button id="insNo">Rechazar</button></div><div class="t" id="insBar"></div></div>
 
 <video id="pipv" class="pipv" muted playsinline></video>
+<div class="alarmbar" id="alarmBar"><span id="alarmTxt"></span><button id="alarmStop">Parar</button></div>
 
 <button class="fab" id="fab">+</button>
 
@@ -152,6 +172,15 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
 
     <label>Color</label>
     <div class="chips colors" id="colors"></div>
+
+    <label>Sonido al terminar</label>
+    <div class="sndrow">
+      <button type="button" id="btnSnd">🎵 Elegir sonido</button>
+      <button type="button" id="btnSndTest">▶</button>
+      <button type="button" id="btnSndX">✕</button>
+    </div>
+    <input type="file" id="fSnd" accept="audio/*" hidden>
+    <div class="hint" id="sndName"></div>
 
     <button class="save" id="btnSave">Guardar</button>
     <button class="cancel" id="btnCancel">Cancelar</button>
@@ -246,7 +275,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
       </div>
       <div class="bar"><i data-k="bar" style="width:${pct}%"></i></div>
       <div class="acts">
-        ${done ? '' : `<button data-a="pin" class="${it.pin?'on':''}">${it.pin?'📌 Fijada':'📌 Fijar'}</button><button data-a="float">🪟 Flotar</button>`}
+        ${done ? `<button data-a="done" class="on">✅ Completada</button><button data-a="restart">🔁</button>` : `<button data-a="pin" class="${it.pin?'on':''}">${it.pin?'📌 Fijada':'📌 Fijar'}</button><button data-a="float" class="${floatIds.has(it.id)?'on':''}">${floatIds.has(it.id)?'🪟 Flotando':'🪟 Flotar'}</button>`}
         <button data-a="edit">✏️</button>
         <button data-a="del">🗑</button>
       </div>
@@ -254,17 +283,29 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
   }
   const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+  function miniHTML(it) {
+    return `<div class="mini" data-id="${it.id}" style="--c:${it.col}">
+      ${it.img?`<img class="thumb" src="${it.img}" alt="">`:`<span class="emoji" style="font-size:24px">${it.e}</span>`}
+      <div class="mn"><b>${esc(it.n)}</b><small>${fmtWhen(it.t)}</small></div>
+      <button data-a="restart" title="Repetir">🔁</button><button data-a="del">🗑</button></div>`;
+  }
   function render() {
     const el = $('#list');
-    if (!items.length) {
-      el.innerHTML = '<div class="empty"><div class="e">⏳</div><p>Aún no tienes cuentas regresivas.<br>Toca <b>+</b> para crear la primera.</p></div>';
-      return;
+    const act = items.filter(i => !i.arch), arc = items.filter(i => i.arch);
+    let html = '';
+    if (!act.length && !arc.length) {
+      html = '<div class="empty"><div class="e">⏳</div><p>Aún no tienes cuentas regresivas.<br>Toca <b>+</b> para crear la primera.</p></div>';
+    } else {
+      const sorted = [...act].sort((a,b) => {
+        const da = a.t < Date.now(), db = b.t < Date.now();
+        return da === db ? a.t - b.t : (da ? 1 : -1);
+      });
+      html = sorted.map((it,i) => cardHTML(it, i===0)).join('');
+      if (arc.length) html += `<details class="arch"><summary>✅ Completadas (${arc.length})</summary>${arc.map(miniHTML).join('')}</details>`;
     }
-    const sorted = [...items].sort((a,b) => {
-      const da = a.t < Date.now(), db = b.t < Date.now();
-      return da === db ? a.t - b.t : (da ? 1 : -1);
-    });
-    el.innerHTML = sorted.map((it,i) => cardHTML(it, i===0)).join('');
+    const open = el.querySelector('details.arch[open]');
+    el.innerHTML = html;
+    if (open) { const d = el.querySelector('details.arch'); if (d) d.open = true; }
   }
 
   /* ---------- Tic cada segundo ---------- */
@@ -281,74 +322,184 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
         card.querySelector('[data-k=m]').textContent = pad(p.m);
         card.querySelector('[data-k=s]').textContent = pad(p.s);
         card.querySelector('[data-k=bar]').style.width = Math.min(100,(now-it.c)/(it.t-it.c)*100)+'%';
-        if (it.pin) show(`${it.e} ${it.n}`, `Faltan ${txt(left)}`, 'pin-'+it.id, { requireInteraction:true, icon: it.img || undefined });
+        if (it.pin) show(`${it.e} ${it.n}`, `Faltan ${txt(left)} · termina ${new Date(it.t).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}`, 'pin-'+it.id, { requireInteraction:true, icon: it.img || undefined, data:{ pin:1, t:it.t, n:it.n, e:it.e } });
       }
       if (left <= 0 && !it.done) {
         it.done = true; rerender = true; save();
         closeNotif('pin-'+it.id);
         if (!fired.has(it.id)) {
           fired.add(it.id);
-          beep();
-          show(`${it.e} ¡Llegó la hora!`, it.n, 'end-'+it.id, { silent:false, vibrate:[300,150,300,150,600], requireInteraction:true, icon: it.img || undefined });
+          startAlarm(it);
+          show(`${it.e} ¡Llegó la hora!`, it.n, 'end-'+it.id, { silent:false, vibrate:[1000,300,1000,300,1000,300,1500], requireInteraction:true, icon: it.img || undefined });
         }
       }
     });
     if (rerender) render();
-    if (floatId) drawFloat();
+    if (floatIds.size) drawFloat();
+    alarming.forEach((t0, id) => { if (now - t0 > 180000) alarming.delete(id); });
+    if (alarming.size) {
+      if (now - lastVib > 4000) { lastVib = now; try { navigator.vibrate && navigator.vibrate([1000,300,1000,300,1000]); } catch (e) {} }
+      if (now - lastNote > 20000) {
+        lastNote = now;
+        alarming.forEach((t0, id) => { const i = items.find(x => x.id === id); if (i) show(`${i.e} ¡Llegó la hora!`, i.n, 'end-'+id, { silent:false, renotify:true, vibrate:[1000,300,1000,300,1000,300,1500], requireInteraction:true, icon: i.img || undefined }); });
+      }
+    }
+    if (!alarming.size && !alarm.paused) { alarm.pause(); updateAlarmBar(); }
     document.title = (() => {
       const next = items.filter(i => i.t > now).sort((a,b)=>a.t-b.t)[0];
       return next ? `${txt(next.t-now)} · FALTA` : 'FALTA';
     })();
   }
-  /* ---------- Ventana flotante (Picture-in-Picture) ---------- */
+  /* ---------- Ventana flotante (Picture-in-Picture) con varias cuentas ---------- */
   const cv = document.createElement('canvas'); cv.width = 640; cv.height = 360;
   const cx = cv.getContext('2d');
-  let floatId = null; const imgCache = {};
+  const floatIds = new Set(); const imgCache = {};
+  let gen = null, fw = null;
   function getImg(src) {
     if (!src) return null;
     if (!imgCache[src]) { const i = new Image(); i.src = src; imgCache[src] = i; }
     return imgCache[src].complete ? imgCache[src] : null;
   }
-  function drawFloat() {
-    const it = items.find(x => x.id === floatId); if (!it) return;
-    const W = 640, H = 360, left = it.t - Date.now(), done = left <= 0, p = parts(left);
-    cx.fillStyle = '#0b0d14'; cx.fillRect(0, 0, W, H);
-    const g = cx.createLinearGradient(0, 0, W, H); g.addColorStop(0, it.col); g.addColorStop(1, '#0b0d14');
-    cx.globalAlpha = .75; cx.fillStyle = g; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1;
-    const im = getImg(it.img);
-    if (im) {
-      const m = Math.min(im.width, im.height);
-      cx.globalAlpha = .35; cx.drawImage(im, (im.width - m)/2, (im.height - m)/2, m, m, 0, (H - W)/2, W, W); cx.globalAlpha = 1;
-    }
-    cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(0, 0, W, H);
-    cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillStyle = '#fff';
-    let label = (im ? '' : it.e + ' ') + it.n;
-    cx.font = 'bold 38px system-ui, sans-serif';
-    while (cx.measureText(label).width > W - 40 && label.length > 4) label = label.slice(0, -2);
-    cx.fillText(label, W/2, 52);
-    if (done) {
-      cx.fillStyle = '#35d07f'; cx.font = 'bold 74px system-ui, sans-serif'; cx.fillText('¡LLEGÓ LA HORA!', W/2, H/2 + 10);
-    } else {
-      cx.font = 'bold 34px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.85)';
-      cx.fillText(p.d > 0 ? `${p.d} ${p.d === 1 ? 'día' : 'días'}` : 'faltan', W/2, 112);
-      cx.fillStyle = '#fff'; cx.font = 'bold 118px ui-monospace, Menlo, Consolas, monospace';
-      cx.fillText(`${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`, W/2, 205);
-      cx.font = '26px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.7)';
-      cx.fillText('horas   ·   minutos   ·   segundos', W/2, 285);
-    }
-    cx.font = 'bold 20px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.55)'; cx.fillText('FALTA', W/2, H - 24);
+  function pushFrame() {
+    if (!fw) return;
+    try { fw.write(new VideoFrame(cv, { timestamp: Math.round(performance.now() * 1000) })).catch(() => {}); } catch (e) {}
   }
-  async function startFloat(it) {
-    if (!document.pictureInPictureEnabled) { alert('Tu navegador no permite la ventana flotante. Usa Chrome actualizado.'); return; }
-    floatId = it.id; drawFloat();
+  function drawFloat() {
+    if (!cx) return;
+    const list = [...floatIds].map(id => items.find(x => x.id === id)).filter(Boolean).sort((a,b) => a.t - b.t);
+    const W = 640, H = 360, now = Date.now();
+    cx.fillStyle = '#0b0d14'; cx.fillRect(0, 0, W, H);
+    cx.textBaseline = 'middle';
+    if (list.length === 1) {
+      const it = list[0], left = it.t - now, done = left <= 0, p = parts(left);
+      const g = cx.createLinearGradient(0, 0, W, H); g.addColorStop(0, it.col); g.addColorStop(1, '#0b0d14');
+      cx.globalAlpha = .75; cx.fillStyle = g; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1;
+      const im = getImg(it.img);
+      if (im) { const m = Math.min(im.width, im.height); cx.globalAlpha = .35; cx.drawImage(im, (im.width-m)/2, (im.height-m)/2, m, m, 0, (H-W)/2, W, W); cx.globalAlpha = 1; }
+      cx.fillStyle = 'rgba(0,0,0,.35)'; cx.fillRect(0, 0, W, H);
+      cx.textAlign = 'center'; cx.fillStyle = '#fff';
+      let label = (im ? '' : it.e + ' ') + it.n;
+      cx.font = 'bold 38px system-ui, sans-serif';
+      while (cx.measureText(label).width > W - 40 && label.length > 4) label = label.slice(0, -2);
+      cx.fillText(label, W/2, 52);
+      if (done) {
+        cx.fillStyle = '#35d07f'; cx.font = 'bold 74px system-ui, sans-serif'; cx.fillText('¡LLEGÓ LA HORA!', W/2, H/2 + 10);
+      } else {
+        cx.font = 'bold 34px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.85)';
+        cx.fillText(p.d > 0 ? `${p.d} ${p.d === 1 ? 'día' : 'días'}` : 'faltan', W/2, 112);
+        cx.fillStyle = '#fff'; cx.font = 'bold 118px ui-monospace, Menlo, Consolas, monospace';
+        cx.fillText(`${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`, W/2, 205);
+        cx.font = '26px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.7)';
+        cx.fillText('horas   ·   minutos   ·   segundos', W/2, 285);
+      }
+    } else if (list.length > 1) {
+      const top = 10, bottom = 34, rh = (H - top - bottom) / list.length;
+      list.forEach((it, i) => {
+        const y = top + i*rh, left = it.t - now, done = left <= 0, p = parts(left);
+        cx.fillStyle = 'rgba(255,255,255,.08)'; cx.fillRect(12, y+3, W-24, rh-6);
+        cx.fillStyle = it.col; cx.fillRect(12, y+3, 8, rh-6);
+        const fs = Math.min(46, rh*.42); let x = 34;
+        const im = getImg(it.img);
+        if (im) { const s = rh - 14, m = Math.min(im.width, im.height); cx.drawImage(im, (im.width-m)/2, (im.height-m)/2, m, m, x, y+7, s, s); x += s + 10; }
+        else { cx.font = `${fs}px system-ui, sans-serif`; cx.textAlign = 'left'; cx.fillStyle = '#fff'; cx.fillText(it.e, x, y + rh/2); x += fs + 12; }
+        const ts = done ? '¡LISTO!' : `${p.d > 0 ? p.d + 'd ' : ''}${pad(p.h)}:${pad(p.m)}:${pad(p.s)}`;
+        cx.font = `bold ${fs}px ui-monospace, Menlo, Consolas, monospace`;
+        const tw = cx.measureText(ts).width;
+        cx.textAlign = 'right'; cx.fillStyle = done ? '#35d07f' : '#fff'; cx.fillText(ts, W-26, y + rh/2);
+        let nm = it.n; const nf = Math.min(32, rh*.34);
+        cx.font = `bold ${nf}px system-ui, sans-serif`;
+        const maxw = W - 26 - tw - x - 14; let cut = false;
+        while (cx.measureText(nm).width > maxw && nm.length > 2) { nm = nm.slice(0, -1); cut = true; }
+        cx.textAlign = 'left'; cx.fillStyle = '#fff'; cx.fillText(cut ? nm + '…' : nm, x, y + rh/2);
+      });
+    }
+    cx.textAlign = 'center'; cx.font = 'bold 20px system-ui, sans-serif'; cx.fillStyle = 'rgba(255,255,255,.55)'; cx.fillText('FALTA', W/2, H - 18);
+    pushFrame();
+  }
+  function setupStream() {
+    const v = $('#pipv'); if (v.srcObject) return;
+    try {
+      if (window.MediaStreamTrackGenerator && window.VideoFrame) {
+        gen = new MediaStreamTrackGenerator({ kind: 'video' });
+        fw = gen.writable.getWriter();
+        v.srcObject = new MediaStream([gen]); return;
+      }
+    } catch (e) { fw = null; gen = null; }
+    v.srcObject = cv.captureStream(10);
+  }
+  async function openPip() {
+    if (!document.pictureInPictureEnabled) { alert('Tu navegador no permite la ventana flotante. Usa Chrome actualizado.'); floatIds.clear(); render(); return; }
     const v = $('#pipv');
     try {
-      if (!v.srcObject) v.srcObject = cv.captureStream(10);
+      setupStream(); drawFloat(); setTimeout(drawFloat, 120);
       await v.play();
       if (document.pictureInPictureElement !== v) await v.requestPictureInPicture();
-    } catch (e) { alert('No se pudo abrir la ventana flotante: ' + (e && e.message || e)); }
+    } catch (e) { alert('No se pudo abrir la ventana flotante: ' + (e && e.message || e)); floatIds.clear(); render(); }
   }
-  $('#pipv').addEventListener('leavepictureinpicture', () => { floatId = null; });
+  async function toggleFloat(it) {
+    if (floatIds.has(it.id)) {
+      floatIds.delete(it.id);
+      if (!floatIds.size) { try { if (document.pictureInPictureElement) await document.exitPictureInPicture(); } catch (e) {} }
+      else drawFloat();
+      render(); return;
+    }
+    floatIds.add(it.id); render();
+    if (document.pictureInPictureElement) drawFloat(); else await openPip();
+  }
+  $('#pipv').addEventListener('leavepictureinpicture', () => { floatIds.clear(); render(); });
+  $('#btnFloatAll').onclick = async () => {
+    const act = items.filter(i => !i.arch && i.t > Date.now());
+    if (!act.length) { alert('No hay cuentas activas para flotar.'); return; }
+    act.forEach(i => floatIds.add(i.id)); render();
+    if (document.pictureInPictureElement) drawFloat(); else await openPip();
+  };
+  try { navigator.mediaSession.setActionHandler('enterpictureinpicture', () => { if (floatIds.size) openPip(); }); } catch (e) {}
+
+  /* ---------- Alarma con sonido propio (suena fuerte, en bucle) ---------- */
+  const idb = new Promise((res, rej) => { try { const r = indexedDB.open('falta-snd', 1); r.onupgradeneeded = () => r.result.createObjectStore('s'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); } catch (e) { rej(e); } });
+  idb.catch(() => {});
+  const idbPut = (k, v) => idb.then(d => new Promise((res, rej) => { const t = d.transaction('s','readwrite'); t.objectStore('s').put(v, k); t.oncomplete = res; t.onerror = rej; }));
+  const idbGet = k => idb.then(d => new Promise(res => { const q = d.transaction('s').objectStore('s').get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); })).catch(() => null);
+  const idbDel = k => idb.then(d => new Promise(res => { const t = d.transaction('s','readwrite'); t.objectStore('s').delete(k); t.oncomplete = res; t.onerror = res; })).catch(() => {});
+  function makeWav() {
+    const sr = 22050, n = Math.floor(sr * 1.6), buf = new ArrayBuffer(44 + n*2), v = new DataView(buf);
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o+i, s.charCodeAt(i)); };
+    w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVEfmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+    v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+    for (let i = 0; i < n; i++) {
+      const t = i/sr, slot = t % .5, on = slot < .28 && t < 1.5, f = slot < .14 ? 1046 : 1318;
+      v.setInt16(44+i*2, on ? (Math.sin(2*Math.PI*f*t) > 0 ? 1 : -1) * .9 * 32767 : 0, true);
+    }
+    return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  }
+  const defaultWavUrl = makeWav();
+  const alarm = new Audio(); alarm.loop = true; alarm.volume = 1;
+  const alarming = new Map();
+  let lastVib = 0, lastNote = 0;
+  function updateAlarmBar() {
+    const bar = $('#alarmBar');
+    if (!alarming.size) { bar.classList.remove('show'); return; }
+    const names = [...alarming.keys()].map(id => { const i = items.find(x => x.id === id); return i ? i.e + ' ' + i.n : ''; }).filter(Boolean).join(', ');
+    $('#alarmTxt').textContent = '¡Llegó la hora! ' + names;
+    bar.classList.add('show');
+  }
+  async function startAlarm(it) {
+    alarming.set(it.id, Date.now());
+    if (alarm.paused) {
+      let url = defaultWavUrl;
+      if (it.snd) { try { const b = await idbGet(it.id); if (b) url = URL.createObjectURL(b); } catch (e) {} }
+      alarm.src = url; alarm.volume = 1;
+      try { await alarm.play(); } catch (e) {}
+    }
+    updateAlarmBar();
+    lastVib = 0; lastNote = Date.now();
+  }
+  function stopAlarm(id) {
+    if (id) alarming.delete(id); else alarming.clear();
+    if (!alarming.size) { try { alarm.pause(); alarm.currentTime = 0; } catch (e) {} try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} }
+    updateAlarmBar();
+  }
+  $('#alarmStop').onclick = () => stopAlarm();
 
   /* Reloj que no se duerme: un Worker marca cada segundo aunque la app esté en segundo plano */
   try {
@@ -378,6 +529,25 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     const b = e.target.closest('[data-q]'); if (!b) return;
     const q = +b.dataset.q, p = parts(q*1000);
     $('#dD').value = p.d; $('#dH').value = p.h; $('#dM').value = p.m; $('#dS').value = p.s;
+  };
+
+  /* ---------- Sonido personalizado en el formulario ---------- */
+  let sndBlob = null, sndName = '', sndRemoved = false, prev = null;
+  function showSnd() { $('#sndName').textContent = sndName || 'Sonido por defecto (alarma fuerte)'; }
+  function stopPreview() { if (prev) { try { prev.pause(); } catch (e) {} prev = null; } }
+  $('#btnSnd').onclick = () => $('#fSnd').click();
+  $('#fSnd').onchange = e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    if (f.size > 8*1024*1024) { alert('Ese sonido pesa demasiado (máximo 8 MB).'); return; }
+    sndBlob = f; sndName = '🎵 ' + f.name; sndRemoved = false; showSnd();
+  };
+  $('#btnSndX').onclick = () => { sndBlob = null; sndName = ''; sndRemoved = true; showSnd(); stopPreview(); };
+  $('#btnSndTest').onclick = async () => {
+    if (prev) { stopPreview(); return; }
+    let b = sndBlob;
+    if (!b && editing && !sndRemoved) b = await idbGet(editing);
+    prev = new Audio(b ? URL.createObjectURL(b) : defaultWavUrl); prev.volume = 1;
+    prev.play().catch(() => {}); setTimeout(stopPreview, 4000);
   };
 
   /* ---------- Imagen de la galería + colores automáticos ---------- */
@@ -447,6 +617,7 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     selEmoji = it ? it.e : EMOJIS[0];
     selColor = it ? it.col : COLORS[0];
     selImg = it ? (it.img || null) : null; showPrev();
+    sndBlob = null; sndRemoved = false; sndName = (it && it.snd) ? '🎵 ' + (it.sndName || 'sonido guardado') : ''; showSnd(); stopPreview();
     const d = new Date(it ? it.t : Date.now() + 86400000);
     $('#fDate').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
     $('#fTime').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -474,11 +645,14 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
     if (isNaN(target)) { alert('Fecha no válida.'); return; }
     if (editing) {
       const it = items.find(x => x.id === editing);
-      Object.assign(it, { n:name, e:selEmoji, col:selColor, img:selImg, t:target, done: target <= Date.now() });
-      fired.delete(it.id);
+      Object.assign(it, { n:name, e:selEmoji, col:selColor, img:selImg, t:target, done: target <= Date.now(), arch:false });
+      fired.delete(it.id); stopAlarm(it.id);
     } else {
       items.push({ id: 'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), n:name, e:selEmoji, col:selColor, img:selImg, t:target, c:Date.now(), pin:false, done:false });
     }
+    const sid = editing || items[items.length-1].id, sit = items.find(x => x.id === sid);
+    if (sndBlob) { idbPut(sid, sndBlob).catch(() => {}); sit.snd = true; sit.sndName = sndBlob.name; }
+    else if (sndRemoved) { idbDel(sid); sit.snd = false; sit.sndName = ''; }
     save(); closeSheet(); render(); tick();
     if ('Notification' in window && Notification.permission === 'default') askPerm();
   };
@@ -486,15 +660,20 @@ input{width:100%;background:var(--card2);border:1px solid #2b3150;color:var(--tx
   /* ---------- Acciones de tarjeta ---------- */
   $('#list').onclick = async e => {
     const b = e.target.closest('button[data-a]'); if (!b) return;
-    const id = b.closest('.card').dataset.id;
+    const id = b.closest('[data-id]').dataset.id;
     const it = items.find(x => x.id === id);
     if (b.dataset.a === 'del') {
       if (!confirm('¿Borrar "' + it.n + '"?')) return;
-      closeNotif('pin-'+id); items = items.filter(x => x.id !== id); save(); render();
+      closeNotif('pin-'+id); stopAlarm(id); floatIds.delete(id); idbDel(id); items = items.filter(x => x.id !== id); save(); render();
     } else if (b.dataset.a === 'edit') {
       openSheet(it);
     } else if (b.dataset.a === 'float') {
-      startFloat(it);
+      toggleFloat(it);
+    } else if (b.dataset.a === 'done') {
+      it.arch = true; it.pin = false; stopAlarm(id); floatIds.delete(id); closeNotif('pin-'+id); closeNotif('end-'+id); save(); render();
+    } else if (b.dataset.a === 'restart') {
+      let dur = it.t - it.c; if (!(dur >= 1000)) dur = 60000;
+      it.c = Date.now(); it.t = it.c + dur; it.done = false; it.arch = false; fired.delete(id); stopAlarm(id); save(); render(); tick();
     } else if (b.dataset.a === 'pin') {
       if (!it.pin) {
         if (!permOK() && !(await askPerm())) return;
